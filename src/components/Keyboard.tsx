@@ -19,7 +19,7 @@ export function Keyboard({ onKeyPress, usedKeys }: KeyboardProps) {
   return (
     <div className="w-full max-w-2xl mx-auto p-2">
       {KEYS.map((row, i) => (
-        <div key={i} className="flex justify-center gap-1 my-1">
+        <div key={i} className="flex flex-wrap justify-center gap-1 my-1">
           {row.map((key) => {
             const state = usedKeys[key];
             const bgColor = state === 'correct' ? 'bg-green-500' :
@@ -31,7 +31,9 @@ export function Keyboard({ onKeyPress, usedKeys }: KeyboardProps) {
                 key={key}
                 onClick={() => handleKeyPress(key)}
                 className={`
-                  ${bgColor} text-2xl font-bold rounded px-3 py-4 min-w-[40px]
+                  ${bgColor} text-xl sm:text-2xl font-bold rounded 
+                  px-1 sm:px-3 py-3 sm:py-4 
+                  min-w-[30px] sm:min-w-[40px]
                   transition-all duration-150 ease-in-out
                   hover:opacity-90 active:scale-95
                   relative overflow-hidden
@@ -49,14 +51,14 @@ export function Keyboard({ onKeyPress, usedKeys }: KeyboardProps) {
       <div className="flex justify-center gap-2 mt-2">
         <button
           onClick={() => handleKeyPress('Backspace')}
-          className="bg-gray-300 px-4 py-2 rounded text-lg hover:bg-gray-400
+          className="bg-gray-300 px-3 sm:px-4 py-2 rounded text-base sm:text-lg hover:bg-gray-400
                      transition-all duration-150 ease-in-out active:scale-95"
         >
           حذف
         </button>
         <button
           onClick={() => handleKeyPress('Enter')}
-          className="bg-gray-300 px-4 py-2 rounded text-lg hover:bg-gray-400
+          className="bg-gray-300 px-3 sm:px-4 py-2 rounded text-base sm:text-lg hover:bg-gray-400
                      transition-all duration-150 ease-in-out active:scale-95"
         >
           إدخال
