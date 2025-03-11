@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WORDS } from './data/words';
+import { translations } from './data/translations';
 import {
   CellState,
   GameState,
   WORD_LENGTH,
   MAX_GUESSES,
   getWordOfTheDay,
-  evaluateGuess
+  evaluateGuess,
+  saveStats,
+  loadStats,
+  generateShareText,
 } from './utils/gameLogic';
+
+// Lazy-load modals for better performance
+const Statistics = lazy(() => import('./components/Statistics'));
+const Instructions = lazy(() => import('./components/Instructions'));
 
 function GameContent() {
   const { theme } = useTheme();
@@ -21,13 +29,44 @@ function GameContent() {
     currentGuess: '',
     gameWon: false,
     gameOver: false,
-    solution: getWordOfTheDay()
+    solution: getWordOfTheDay(),
   }));
 
   const [evaluations, setEvaluations] = useState<CellState[][]>([]);
   const [usedKeys, setUsedKeys] = useState<Record<string, CellState>>({});
   const [isRevealing, setIsRevealing] = useState(false);
   const [invalidGuess, setInvalidGuess] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [isRandomMode, setIsRandomMode] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  // Update solution based on random mode
+  const solution = isRandomMode ? WORDS[Math.floor(Math.random() * WORDS.length)] : getWordOfTheDay();
+
+  useEffect(() => {
+    if (gameState.gameOver) {
+      setShowStats(true);
+      saveStats(gameState.gameWon, gameState.guesses.length);
+    }
+  }, [gameState.gameOver]);
+
+  const handleShare = () => {
+    const shareText = generateShareText(gameState.guesses, evaluations, gameState.solution, gameState.gameWon);
+    if (navigator.share) {
+      navigator.share({
+        title: translations.ar.shareTitle,
+        text: shareText,
+      }).catch(() => {
+        navigator.clipboard.writeText(shareText);
+        setFeedback(translations.ar.copiedToClipboard);
+      });
+    } else {
+      navigator.clipboard.writeText(shareText);
+      setFeedback(translations.ar.copiedToClipboard);
+    }
+    setTimeout(() => setFeedback(''), 2000);
+  };
 
   const handleKeyPress = (key: string) => {
     if (gameState.gameOver) return;
@@ -35,7 +74,21 @@ function GameContent() {
     if (key === 'Enter') {
       if (gameState.currentGuess.length !== WORD_LENGTH) {
         setInvalidGuess(true);
-        setTimeout(() => setInvalidGuess(false), 600);
+        setFeedback(translations.ar.invalidGuessLength);
+        setTimeout(() => {
+          setInvalidGuess(false);
+          setFeedback('');
+        }, 600);
+        return;
+      }
+
+      if (!WORDS.includes(gameState.currentGuess)) {
+        setInvalidGuess(true);
+        setFeedback(translations.ar.invalidGuessNotInList);
+        setTimeout(() => {
+          setInvalidGuess(false);
+          setFeedback('');
+        }, 600);
         return;
       }
 
@@ -43,14 +96,15 @@ function GameContent() {
       const newEvaluations = [...evaluations, evaluation];
       const newGuesses = [...gameState.guesses, gameState.currentGuess];
 
-      // Update used keys
       const newUsedKeys = { ...usedKeys };
       [...gameState.currentGuess].forEach((letter, i) => {
         const currentState = newUsedKeys[letter];
         const newState = evaluation[i];
-        if (newState === 'correct' ||
-            (newState === 'present' && currentState !== 'correct') ||
-            (!currentState && newState === 'absent')) {
+        if (
+          newState === 'correct' ||
+          (newState === 'present' && currentState !== 'correct') ||
+          (!currentState && newState === 'absent')
+        ) {
           newUsedKeys[letter] = newState;
         }
       });
@@ -61,22 +115,22 @@ function GameContent() {
       setEvaluations(newEvaluations);
       setUsedKeys(newUsedKeys);
 
-      setGameState(prev => ({
+      setGameState((prev) => ({
         ...prev,
         guesses: newGuesses,
         currentGuess: '',
         gameWon: gameState.currentGuess === gameState.solution,
-        gameOver: gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES
+        gameOver: gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES,
       }));
     } else if (key === 'Backspace') {
-      setGameState(prev => ({
+      setGameState((prev) => ({
         ...prev,
-        currentGuess: prev.currentGuess.slice(0, -1)
+        currentGuess: prev.currentGuess.slice(0, -1),
       }));
     } else if (gameState.currentGuess.length < WORD_LENGTH) {
-      setGameState(prev => ({
+      setGameState((prev) => ({
         ...prev,
-        currentGuess: prev.currentGuess + key
+        currentGuess: prev.currentGuess + key,
       }));
     }
   };
@@ -85,13 +139,39 @@ function GameContent() {
     <div dir="rtl" className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center transition-colors duration-300">
       <header className="w-full bg-white dark:bg-gray-800 shadow-md p-4 mb-4 transition-colors duration-300">
         <div className="flex justify-between items-center max-w-lg mx-auto">
-          <div className="w-8"></div> {/* Spacer for alignment */}
-          <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-gray-100">كلمه</h1>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowInstructions(true)}
+              className="text-gray-900 dark:text-gray-100 hover:underline"
+            >
+              {translations.ar.howToPlay}
+            </button>
+            <button
+              onClick={() => setShowStats(true)}
+              className="text-gray-900 dark:text-gray-100 hover:underline"
+            >
+              {translations.ar.stats}
+            </button>
+            <button
+              onClick={() => setIsRandomMode(!isRandomMode)}
+              className="text-gray-900 dark:text-gray-100 hover:underline"
+            >
+              {isRandomMode ? translations.ar.dailyMode : translations.ar.randomMode}
+            </button>
+          </div>
+          <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-gray-100">
+            {translations.ar.title}
+          </h1>
           <ThemeToggle />
         </div>
       </header>
 
       <main className="flex-1 w-full max-w-lg mx-auto flex flex-col items-center justify-between p-4">
+        {feedback && (
+          <div className="mb-4 text-center text-red-600 dark:text-red-500">
+            {feedback}
+          </div>
+        )}
         <Grid
           guesses={gameState.guesses}
           currentGuess={gameState.currentGuess}
@@ -105,17 +185,45 @@ function GameContent() {
         {gameState.gameOver && (
           <div className="my-4 text-center">
             {gameState.gameWon ? (
-              <p className="text-2xl font-bold text-green-600 dark:text-green-500">أحسنت! لقد فزت!</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-500">
+                {translations.ar.winMessage}
+              </p>
             ) : (
               <div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-500">حظاً أوفر في المرة القادمة!</p>
-                <p className="mt-2 text-gray-800 dark:text-gray-300">الكلمة كانت: {gameState.solution}</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-500">
+                  {translations.ar.loseMessage}
+                </p>
+                <p className="mt-2 text-gray-800 dark:text-gray-300">
+                  {translations.ar.solutionMessage} {gameState.solution}
+                </p>
               </div>
             )}
+            <button
+              onClick={handleShare}
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              {translations.ar.shareResult}
+            </button>
           </div>
         )}
 
         <Keyboard onKeyPress={handleKeyPress} usedKeys={usedKeys} />
+
+        {showInstructions && (
+          <Suspense fallback={<div>جارٍ التحميل...</div>}>
+            <Instructions handleClose={() => setShowInstructions(false)} />
+          </Suspense>
+        )}
+        {showStats && (
+          <Suspense fallback={<div>جارٍ التحميل...</div>}>
+            <Statistics
+              stats={loadStats()}
+              solution={gameState.solution}
+              gameWon={gameState.gameWon}
+              handleClose={() => setShowStats(false)}
+            />
+          </Suspense>
+        )}
       </main>
     </div>
   );
