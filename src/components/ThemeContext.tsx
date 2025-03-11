@@ -9,28 +9,29 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/**
+ * Provides theme context to the application, allowing toggling between light and dark modes.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Load theme from localStorage or use system preference
     const savedTheme = localStorage.getItem('theme') as Theme | null;
     if (savedTheme) return savedTheme;
-    
+
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
-    
+
     return 'light';
   });
 
   useEffect(() => {
-    // Update document class when theme changes
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
   return (
@@ -40,6 +41,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Hook to access the theme context.
+ * @throws {Error} If used outside of a ThemeProvider.
+ */
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
