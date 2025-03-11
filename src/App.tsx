@@ -46,16 +46,27 @@ function GameContent() {
   const [isRandomMode, setIsRandomMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
-  // New state for multi-tier validation
   const [localCache, setLocalCache] = useState<Set<string>>(new Set());
+  const [extendedWordlist, setExtendedWordlist] = useState<Set<string>>(new Set());
   const [isValidating, setIsValidating] = useState(false);
 
-  // Load local cache from localStorage on mount
+  // Load local cache and fetch extended wordlist on mount
   useEffect(() => {
     const cachedWords = localStorage.getItem('validWordsCache');
     if (cachedWords) {
       setLocalCache(new Set(JSON.parse(cachedWords)));
     }
+
+    // Fetch extended wordlist (replace with your URL)
+    fetch('https://raw.githubusercontent.com/username/repo/main/arabic_wordlist.json')
+      .then((response) => response.json())
+      .then((data) => {
+        console.log('Fetched extended wordlist:', data);
+        setExtendedWordlist(new Set(data));
+      })
+      .catch((error) => {
+        console.error('Failed to fetch extended wordlist:', error);
+      });
   }, []);
 
   // Save a word to the local cache
@@ -64,21 +75,6 @@ function GameContent() {
     newCache.add(word);
     setLocalCache(newCache);
     localStorage.setItem('validWordsCache', JSON.stringify(Array.from(newCache)));
-  };
-
-  // Check word validity with DictionaryAPI.dev
-  const checkWordWithAPI = async (word: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/ar/${word}`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.length > 0; // Valid if API returns entries
-      }
-      return false; // Invalid if 404 or other non-success status
-    } catch (error) {
-      console.error('API error:', error);
-      throw error; // Propagate error for fallback handling
-    }
   };
 
   // Update solution and reset game state when mode changes
@@ -151,7 +147,6 @@ function GameContent() {
         return;
       }
 
-      // Process the guess after validation
       const processGuess = () => {
         const evaluation = evaluateGuess(gameState.currentGuess, gameState.solution);
         const newEvaluations = [...evaluations, evaluation];
@@ -187,34 +182,27 @@ function GameContent() {
       };
 
       // Multi-tier validation
-      if (WORDS.includes(gameState.currentGuess) || localCache.has(gameState.currentGuess)) {
-        processGuess(); // Tier 1 & 2: Local validation
+      console.log(`Validating word: ${gameState.currentGuess}`);
+      if (WORDS.includes(gameState.currentGuess)) {
+        console.log('Word found in local WORDS list');
+        processGuess();
+      } else if (localCache.has(gameState.currentGuess)) {
+        console.log('Word found in local cache');
+        processGuess();
+      } else if (extendedWordlist.has(gameState.currentGuess)) {
+        console.log('Word found in extended wordlist');
+        saveToCache(gameState.currentGuess);
+        setFeedback('تم قبول الكلمة الجديدة!');
+        setTimeout(() => setFeedback(''), 2000);
+        processGuess();
       } else {
-        setIsValidating(true);
-        checkWordWithAPI(gameState.currentGuess)
-          .then((isValid) => {
-            setIsValidating(false);
-            if (isValid) {
-              saveToCache(gameState.currentGuess);
-              processGuess(); // Tier 3: API confirmed
-            } else {
-              setInvalidGuess(true);
-              setFeedback(translations.ar.invalidGuessNotInList);
-              setTimeout(() => {
-                setInvalidGuess(false);
-                setFeedback('');
-              }, 600);
-            }
-          })
-          .catch(() => {
-            setIsValidating(false);
-            setInvalidGuess(true);
-            setFeedback('تعذر التحقق من الكلمة، حاول لاحقًا');
-            setTimeout(() => {
-              setInvalidGuess(false);
-              setFeedback('');
-            }, 600);
-          });
+        // If not found, assume invalid (or implement lenient validation here)
+        setInvalidGuess(true);
+        setFeedback(translations.ar.invalidGuessNotInList);
+        setTimeout(() => {
+          setInvalidGuess(false);
+          setFeedback('');
+        }, 600);
       }
     } else if (key === 'Backspace') {
       setGameState((prev) => ({
