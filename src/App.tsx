@@ -1,8 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Grid } from './components/Grid';
-import { Keyboard } from './components/Keyboard';
-import { ThemeProvider, useTheme } from './components/ThemeContext';
-import { ThemeToggle } from './components/ThemeToggle';
+import { Grid } from './components/Grid.tsx';
+import { Keyboard } from './components/Keyboard.tsx';
+import { ThemeProvider, useTheme } from './components/ThemeContext.tsx';
+import { ThemeToggle } from './components/ThemeToggle.tsx';
 import { WORDS } from './data/words';
 import { translations } from './data/translations';
 import {
@@ -18,21 +18,25 @@ import {
 } from './utils/gameLogic';
 
 // Lazy-load modals for better performance
-const Statistics = lazy(() => import('./components/Statistics'));
-const Instructions = lazy(() => import('./components/Instructions'));
+const Statistics = lazy(() => import('./components/Statistics.tsx'));
+const Instructions = lazy(() => import('./components/Instructions.tsx'));
 
 function GameContent() {
   const { theme } = useTheme();
 
-  const [gameState, setGameState] = useState<GameState>(() => ({
-    guesses: [],
-    currentGuess: '',
-    gameWon: false,
-    gameOver: false,
-    solution: getWordOfTheDay(),
-  }));
-
-  const [evaluations, setEvaluations] = useState<CellState[][]>([]);
+  const [gameState, setGameState] = useState<GameState>(() => {
+    const { state, evaluations } = loadGameState();
+    return state || {
+      guesses: [],
+      currentGuess: '',
+      gameWon: false,
+      gameOver: false,
+      solution: getWordOfTheDay(),
+    };
+  });
+  const [evaluations, setEvaluations] = useState<CellState[][]>(
+    loadGameState().evaluations || []
+  );
   const [usedKeys, setUsedKeys] = useState<Record<string, CellState>>({});
   const [isRevealing, setIsRevealing] = useState(false);
   const [invalidGuess, setInvalidGuess] = useState(false);
@@ -41,23 +45,47 @@ function GameContent() {
   const [showStats, setShowStats] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
 
-  // Update solution based on random mode
-  const solution = isRandomMode ? WORDS[Math.floor(Math.random() * WORDS.length)] : getWordOfTheDay();
+  // Update solution and reset game state when mode changes
+  const solution = isRandomMode
+    ? WORDS[Math.floor(Math.random() * WORDS.length)]
+    : getWordOfTheDay();
+  useEffect(() => {
+    setGameState((prev) => ({
+      ...prev,
+      guesses: [],
+      currentGuess: '',
+      gameWon: false,
+      gameOver: false,
+      solution,
+    }));
+    setEvaluations([]);
+    setUsedKeys({});
+  }, [isRandomMode, solution]);
 
   useEffect(() => {
     if (gameState.gameOver) {
-      setShowStats(true);
-      saveStats(gameState.gameWon, gameState.guesses.length);
+      // Delay showing stats to allow game state to stabilize
+      const timer = setTimeout(() => {
+        setShowStats(true);
+        saveStats(gameState.gameWon, gameState.guesses.length);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [gameState.gameOver]);
 
   const handleShare = () => {
-    const shareText = generateShareText(gameState.guesses, evaluations, gameState.solution, gameState.gameWon);
+    const shareText = generateShareText(
+      gameState.guesses,
+      evaluations,
+      gameState.solution,
+      gameState.gameWon
+    );
     if (navigator.share) {
       navigator.share({
         title: translations.ar.shareTitle,
         text: shareText,
-      }).catch(() => {
+      }).catch((err) => {
+        console.error('Share failed:', err);
         navigator.clipboard.writeText(shareText);
         setFeedback(translations.ar.copiedToClipboard);
       });
@@ -120,7 +148,8 @@ function GameContent() {
         guesses: newGuesses,
         currentGuess: '',
         gameWon: gameState.currentGuess === gameState.solution,
-        gameOver: gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES,
+        gameOver:
+          gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES,
       }));
     } else if (key === 'Backspace') {
       setGameState((prev) => ({
@@ -136,25 +165,33 @@ function GameContent() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center transition-colors duration-300">
+    <div
+      dir="rtl"
+      className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center transition-colors duration-300"
+    >
       <header className="w-full bg-white dark:bg-gray-800 shadow-md p-4 mb-4 transition-colors duration-300">
         <div className="flex justify-between items-center max-w-lg mx-auto">
           <div className="flex space-x-2">
             <button
               onClick={() => setShowInstructions(true)}
               className="text-gray-900 dark:text-gray-100 hover:underline"
+              aria-label={translations.ar.howToPlay}
             >
               {translations.ar.howToPlay}
             </button>
             <button
               onClick={() => setShowStats(true)}
               className="text-gray-900 dark:text-gray-100 hover:underline"
+              aria-label={translations.ar.stats}
             >
               {translations.ar.stats}
             </button>
             <button
               onClick={() => setIsRandomMode(!isRandomMode)}
               className="text-gray-900 dark:text-gray-100 hover:underline"
+              aria-label={
+                isRandomMode ? translations.ar.dailyMode : translations.ar.randomMode
+              }
             >
               {isRandomMode ? translations.ar.dailyMode : translations.ar.randomMode}
             </button>
@@ -210,12 +247,12 @@ function GameContent() {
         <Keyboard onKeyPress={handleKeyPress} usedKeys={usedKeys} />
 
         {showInstructions && (
-          <Suspense fallback={<div>جارٍ التحميل...</div>}>
+          <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
             <Instructions handleClose={() => setShowInstructions(false)} />
           </Suspense>
         )}
         {showStats && (
-          <Suspense fallback={<div>جارٍ التحميل...</div>}>
+          <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
             <Statistics
               stats={loadStats()}
               solution={gameState.solution}
