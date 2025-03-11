@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Grid } from './components/Grid';
 import { Keyboard } from './components/Keyboard';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import { WORDS } from './data/words';
 import {
   CellState,
@@ -11,7 +13,9 @@ import {
   evaluateGuess
 } from './utils/gameLogic';
 
-function App() {
+function GameContent() {
+  const { theme } = useTheme();
+
   const [gameState, setGameState] = useState<GameState>(() => ({
     guesses: [],
     currentGuess: '',
@@ -78,9 +82,13 @@ function App() {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-100 flex flex-col items-center">
-      <header className="w-full bg-white shadow-md p-4 mb-4">
-        <h1 className="text-3xl font-bold text-center">كلمه</h1>
+    <div dir="rtl" className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center transition-colors duration-300">
+      <header className="w-full bg-white dark:bg-gray-800 shadow-md p-4 mb-4 transition-colors duration-300">
+        <div className="flex justify-between items-center max-w-lg mx-auto">
+          <div className="w-8"></div> {/* Spacer for alignment */}
+          <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-gray-100">كلمه</h1>
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="flex-1 w-full max-w-lg mx-auto flex flex-col items-center justify-between p-4">
@@ -91,16 +99,17 @@ function App() {
           evaluations={evaluations}
           isRevealing={isRevealing}
           invalidGuess={invalidGuess}
+          theme={theme}
         />
 
         {gameState.gameOver && (
           <div className="my-4 text-center">
             {gameState.gameWon ? (
-              <p className="text-2xl font-bold text-green-600">أحسنت! لقد فزت!</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-500">أحسنت! لقد فزت!</p>
             ) : (
               <div>
-                <p className="text-2xl font-bold text-red-600">حظاً أوفر في المرة القادمة!</p>
-                <p className="mt-2">الكلمة كانت: {gameState.solution}</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-500">حظاً أوفر في المرة القادمة!</p>
+                <p className="mt-2 text-gray-800 dark:text-gray-300">الكلمة كانت: {gameState.solution}</p>
               </div>
             )}
           </div>
@@ -109,6 +118,14 @@ function App() {
         <Keyboard onKeyPress={handleKeyPress} usedKeys={usedKeys} />
       </main>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <GameContent />
+    </ThemeProvider>
   );
 }
 
