@@ -4,7 +4,7 @@ import { Keyboard } from './components/Keyboard';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WORDS } from './data/words';
-import { DICT } from './data/dict'; // Import the new dict.ts
+import { DICT } from './data/dict'; // Import dict.ts
 import { translations } from './data/translations';
 import {
   CellState,
@@ -53,11 +53,14 @@ function GameContent() {
   useEffect(() => {
     const cachedWords = localStorage.getItem('validWordsCache');
     if (cachedWords) {
+      console.log('Loaded localCache from storage:', cachedWords);
       setLocalCache(new Set(JSON.parse(cachedWords)));
     }
 
     console.log('Initializing dictionary from DICT...');
+    console.log('DICT sample (first 10):', DICT.slice(0, 10));
     const fiveLetterWords = DICT.filter((word) => word.length === WORD_LENGTH);
+    console.log('Filtered 5-letter words sample (first 10):', fiveLetterWords.slice(0, 10));
     setDictionary(new Set(fiveLetterWords));
     console.log(`Loaded ${fiveLetterWords.length} 5-letter words into dictionary`);
   }, []);
@@ -68,6 +71,7 @@ function GameContent() {
     newCache.add(word);
     setLocalCache(newCache);
     localStorage.setItem('validWordsCache', JSON.stringify(Array.from(newCache)));
+    console.log(`Added "${word}" to localCache. New size: ${newCache.size}`);
   };
 
   const solution = isRandomMode
@@ -173,21 +177,26 @@ function GameContent() {
         }));
       };
 
-      // Multi-tier validation using dict.ts
-      console.log(`Validating word: ${gameState.currentGuess}`);
+      // Multi-tier validation with debug logs
+      console.log(`Validating word: "${gameState.currentGuess}"`);
+      console.log(`WORDS length: ${WORDS.length}, Sample:`, WORDS.slice(0, 5));
+      console.log(`localCache size: ${localCache.size}`);
+      console.log(`dictionary size: ${dictionary.size}`);
+
       if (WORDS.includes(gameState.currentGuess)) {
-        console.log('Word found in local WORDS list');
+        console.log(`"${gameState.currentGuess}" found in WORDS`);
         processGuess();
       } else if (localCache.has(gameState.currentGuess)) {
-        console.log('Word found in local cache');
+        console.log(`"${gameState.currentGuess}" found in localCache`);
         processGuess();
       } else if (dictionary.has(gameState.currentGuess)) {
-        console.log('Word found in dictionary');
+        console.log(`"${gameState.currentGuess}" found in dictionary`);
         saveToCache(gameState.currentGuess);
         setFeedback('تم قبول الكلمة الجديدة!');
         setTimeout(() => setFeedback(''), 2000);
         processGuess();
       } else {
+        console.log(`"${gameState.currentGuess}" not found in any list`);
         setInvalidGuess(true);
         setFeedback(translations.ar.invalidGuessNotInList);
         setTimeout(() => {
