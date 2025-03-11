@@ -4,6 +4,7 @@ import { Keyboard } from './components/Keyboard';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { ThemeToggle } from './components/ThemeToggle';
 import { WORDS } from './data/words';
+import { DICT } from './data/dict'; // Import the new dict.ts
 import { translations } from './data/translations';
 import {
   CellState,
@@ -19,7 +20,6 @@ import {
   saveGameState,
 } from './utils/gameLogic';
 
-// Lazy-load modals for better performance
 const Statistics = lazy(() => import('./components/Statistics').then(module => ({ default: module.Statistics })));
 const Instructions = lazy(() => import('./components/Instructions').then(module => ({ default: module.Instructions })));
 
@@ -47,26 +47,19 @@ function GameContent() {
   const [showStats, setShowStats] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [localCache, setLocalCache] = useState<Set<string>>(new Set());
-  const [extendedWordlist, setExtendedWordlist] = useState<Set<string>>(new Set());
-  const [isValidating, setIsValidating] = useState(false);
+  const [dictionary, setDictionary] = useState<Set<string>>(new Set());
 
-  // Load local cache and fetch extended wordlist on mount
+  // Load local cache and initialize dictionary from DICT on mount
   useEffect(() => {
     const cachedWords = localStorage.getItem('validWordsCache');
     if (cachedWords) {
       setLocalCache(new Set(JSON.parse(cachedWords)));
     }
 
-    // Fetch extended wordlist (replace with your URL)
-    fetch('https://raw.githubusercontent.com/username/repo/main/arabic_wordlist.json')
-      .then((response) => response.json())
-      .then((data) => {
-        console.log('Fetched extended wordlist:', data);
-        setExtendedWordlist(new Set(data));
-      })
-      .catch((error) => {
-        console.error('Failed to fetch extended wordlist:', error);
-      });
+    console.log('Initializing dictionary from DICT...');
+    const fiveLetterWords = DICT.filter((word) => word.length === WORD_LENGTH);
+    setDictionary(new Set(fiveLetterWords));
+    console.log(`Loaded ${fiveLetterWords.length} 5-letter words into dictionary`);
   }, []);
 
   // Save a word to the local cache
@@ -77,7 +70,6 @@ function GameContent() {
     localStorage.setItem('validWordsCache', JSON.stringify(Array.from(newCache)));
   };
 
-  // Update solution and reset game state when mode changes
   const solution = isRandomMode
     ? WORDS[Math.floor(Math.random() * WORDS.length)]
     : getWordOfTheDay();
@@ -134,7 +126,7 @@ function GameContent() {
   };
 
   const handleKeyPress = (key: string) => {
-    if (gameState.gameOver || isValidating) return;
+    if (gameState.gameOver) return;
 
     if (key === 'Enter') {
       if (gameState.currentGuess.length !== WORD_LENGTH) {
@@ -181,7 +173,7 @@ function GameContent() {
         }));
       };
 
-      // Multi-tier validation
+      // Multi-tier validation using dict.ts
       console.log(`Validating word: ${gameState.currentGuess}`);
       if (WORDS.includes(gameState.currentGuess)) {
         console.log('Word found in local WORDS list');
@@ -189,14 +181,13 @@ function GameContent() {
       } else if (localCache.has(gameState.currentGuess)) {
         console.log('Word found in local cache');
         processGuess();
-      } else if (extendedWordlist.has(gameState.currentGuess)) {
-        console.log('Word found in extended wordlist');
+      } else if (dictionary.has(gameState.currentGuess)) {
+        console.log('Word found in dictionary');
         saveToCache(gameState.currentGuess);
         setFeedback('تم قبول الكلمة الجديدة!');
         setTimeout(() => setFeedback(''), 2000);
         processGuess();
       } else {
-        // If not found, assume invalid (or implement lenient validation here)
         setInvalidGuess(true);
         setFeedback(translations.ar.invalidGuessNotInList);
         setTimeout(() => {
