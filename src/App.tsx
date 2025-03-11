@@ -1,8 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Grid } from './components/Grid.tsx';
-import { Keyboard } from './components/Keyboard.tsx';
-import { ThemeProvider, useTheme } from './components/ThemeContext.tsx';
-import { ThemeToggle } from './components/ThemeToggle.tsx';
+import { Grid } from './components/Grid';
+import { Keyboard } from './components/Keyboard';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import { WORDS } from './data/words';
 import { translations } from './data/translations';
 import {
@@ -15,17 +15,19 @@ import {
   saveStats,
   loadStats,
   generateShareText,
+  loadGameState,
+  saveGameState,
 } from './utils/gameLogic';
 
 // Lazy-load modals for better performance
-const Statistics = lazy(() => import('./components/Statistics.tsx'));
-const Instructions = lazy(() => import('./components/Instructions.tsx'));
+const Statistics = lazy(() => import('./components/Statistics').then(module => ({ default: module.Statistics })));
+const Instructions = lazy(() => import('./components/Instructions').then(module => ({ default: module.Instructions })));
 
 function GameContent() {
   const { theme } = useTheme();
 
   const [gameState, setGameState] = useState<GameState>(() => {
-    const { state, evaluations } = loadGameState();
+    const { state, evaluations: savedEvals } = loadGameState();
     return state || {
       guesses: [],
       currentGuess: '',
@@ -72,6 +74,13 @@ function GameContent() {
       return () => clearTimeout(timer);
     }
   }, [gameState.gameOver]);
+
+  // Save game state when it changes
+  useEffect(() => {
+    if (gameState.guesses.length > 0) {
+      saveGameState(gameState, evaluations);
+    }
+  }, [gameState, evaluations]);
 
   const handleShare = () => {
     const shareText = generateShareText(
@@ -174,26 +183,37 @@ function GameContent() {
           <div className="flex space-x-2">
             <button
               onClick={() => setShowInstructions(true)}
-              className="text-gray-900 dark:text-gray-100 hover:underline"
+              className="text-gray-900 dark:text-gray-100 p-2"
               aria-label={translations.ar.howToPlay}
             >
-              {translations.ar.howToPlay}
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </button>
             <button
               onClick={() => setShowStats(true)}
-              className="text-gray-900 dark:text-gray-100 hover:underline"
+              className="text-gray-900 dark:text-gray-100 p-2"
               aria-label={translations.ar.stats}
             >
-              {translations.ar.stats}
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
             </button>
             <button
               onClick={() => setIsRandomMode(!isRandomMode)}
-              className="text-gray-900 dark:text-gray-100 hover:underline"
+              className="text-gray-900 dark:text-gray-100 p-2"
               aria-label={
                 isRandomMode ? translations.ar.dailyMode : translations.ar.randomMode
               }
             >
-              {isRandomMode ? translations.ar.dailyMode : translations.ar.randomMode}
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d={isRandomMode 
+                         ? "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                         : "M19.48 17.839a2 2 0 11-2.979 2.667 2 2 0 012.98-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667zM19.48 11.952a2 2 0 11-2.979 2.667 2 2 0 012.98-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667zM19.48 6.065a2 2 0 11-2.979 2.667 2 2 0 012.98-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667zm-6.987 0a2 2 0 11-2.979 2.667 2 2 0 012.979-2.667z"} />
+              </svg>
             </button>
           </div>
           <h1 className="text-3xl font-bold text-center text-gray-900 dark:text-gray-100">
