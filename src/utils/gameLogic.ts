@@ -38,15 +38,20 @@ export function loadGameState(): { state: GameState | null; evaluations: CellSta
     return { state: null, evaluations: null };
   }
 
-  const state = JSON.parse(savedState);
-  const evaluations = JSON.parse(savedEvaluations);
+  try {
+    const state = JSON.parse(savedState);
+    const evaluations = JSON.parse(savedEvaluations);
 
-  const todaySolution = getWordOfTheDay();
-  if (state.solution !== todaySolution) {
+    const todaySolution = getWordOfTheDay();
+    if (state.solution !== todaySolution) {
+      return { state: null, evaluations: null };
+    }
+
+    return { state, evaluations };
+  } catch (error) {
+    console.error("Error parsing saved game state:", error);
     return { state: null, evaluations: null };
   }
-
-  return { state, evaluations };
 }
 
 /**
@@ -85,7 +90,18 @@ export function loadStats() {
     };
   }
 
-  return JSON.parse(savedStats);
+  try {
+    return JSON.parse(savedStats);
+  } catch (error) {
+    console.error("Error parsing statistics:", error);
+    return {
+      totalPlayed: 0,
+      wins: 0,
+      currentStreak: 0,
+      maxStreak: 0,
+      distribution: [0, 0, 0, 0, 0, 0],
+    };
+  }
 }
 
 /**
