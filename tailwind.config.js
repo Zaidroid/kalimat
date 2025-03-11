@@ -26,12 +26,17 @@ export default {
             opacity: '0',
           },
         },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
         shake: 'shake 0.5s ease-in-out',
         pop: 'pop 0.15s ease-in-out',
         flip: 'flip 0.25s ease-in-out',
         ripple: 'ripple 0.6s linear',
+        fadeIn: 'fadeIn 0.3s ease-in',
       },
       perspective: {
         '1000': '1000px',
