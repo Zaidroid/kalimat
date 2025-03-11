@@ -8,9 +8,10 @@ interface GridProps {
   evaluations: CellState[][];
   isRevealing?: boolean;
   invalidGuess?: boolean;
+  theme?: 'light' | 'dark';
 }
 
-export function Grid({ guesses, currentGuess, solution, evaluations, isRevealing, invalidGuess }: GridProps) {
+export function Grid({ guesses, currentGuess, solution, evaluations, isRevealing, invalidGuess, theme }: GridProps) {
   const rows = Array(6).fill(null);
 
   return (
@@ -33,11 +34,14 @@ export function Grid({ guesses, currentGuess, solution, evaluations, isRevealing
               const shouldReveal = isRevealing && i === guesses.length - 1;
               const revealDelay = shouldReveal ? `${j * 50}ms` : '0ms';
 
-              const bgColor = cellState === 'correct' ? 'bg-green-500' :
-                            cellState === 'present' ? 'bg-yellow-500' :
-                            cellState === 'absent' ? 'bg-gray-500' : 'bg-white';
-              const border = cellState === 'empty' ? 'border-2 border-gray-300' : '';
-              const textColor = cellState === 'empty' ? 'text-black' : 'text-white';
+              // Use theme-specific colors
+              const bgColor = cellState === 'correct' ? 'bg-green-500 dark:bg-green-600' :
+                            cellState === 'present' ? 'bg-yellow-500 dark:bg-yellow-600' :
+                            cellState === 'absent' ? 'bg-gray-500 dark:bg-gray-600' : 
+                            'bg-white dark:bg-gray-800';
+              
+              const border = cellState === 'empty' ? 'border-2 border-gray-300 dark:border-gray-600' : '';
+              const textColor = cellState === 'empty' ? 'text-black dark:text-white' : 'text-white';
 
               return (
                 <div
