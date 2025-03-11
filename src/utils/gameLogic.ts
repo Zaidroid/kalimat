@@ -10,6 +10,50 @@ export interface GameState {
   solution: string;
 }
 
+// Add this function to gameLogic.ts
+
+export function generateShareText(guesses: string[], evaluations: CellState[][], solution: string, gameWon: boolean): string {
+  // Create emoji grid based on evaluations
+  const emojiGrid = evaluations.map(row => 
+    row.map(state => {
+      if (state === 'correct') return '🟩';  // Green square for correct
+      if (state === 'present') return '🟨';  // Yellow square for present
+      return '⬛';  // Black square for absent
+    }).join('')
+  ).join('\n');
+  
+  // Generate header with number of guesses or X if lost
+  const guessCount = gameWon ? guesses.length : 'X';
+  
+  return `كلمه ${guessCount}/${MAX_GUESSES}\n\n${emojiGrid}`;
+}
+
+// In your App.tsx, add a share button when game is over
+const handleShare = () => {
+  const shareText = generateShareText(
+    gameState.guesses, 
+    evaluations, 
+    gameState.solution, 
+    gameState.gameWon
+  );
+  
+  if (navigator.share) {
+    navigator.share({
+      title: 'كلمه - نتيجتي اليوم',
+      text: shareText
+    }).catch(error => {
+      console.log('Error sharing:', error);
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(shareText);
+      alert('تم نسخ النتيجة إلى الحافظة!');
+    });
+  } else {
+    // Fallback for browsers without Web Share API
+    navigator.clipboard.writeText(shareText);
+    alert('تم نسخ النتيجة إلى الحافظة!');
+  }
+};
+
 export const WORD_LENGTH = 5;
 export const MAX_GUESSES = 6;
 
