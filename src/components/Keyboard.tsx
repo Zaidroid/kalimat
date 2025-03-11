@@ -1,9 +1,10 @@
 import React from 'react';
 
+// Arabic keyboard layout following standard layout patterns
 const KEYS = [
-  ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'],
-  ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك'],
-  ['ظ', 'ط', 'ذ', 'د', 'ز', 'ر', 'و', 'ة', 'ى', 'ئ']
+  ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج', 'د'],
+  ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك', 'ط'],
+  ['ئ', 'ء', 'ؤ', 'ر', 'ل', 'ى', 'ة', 'و', 'ز', 'ظ', 'ذ']
 ];
 
 interface KeyboardProps {
@@ -19,7 +20,7 @@ export function Keyboard({ onKeyPress, usedKeys }: KeyboardProps) {
   return (
     <div className="w-full max-w-2xl mx-auto p-2">
       {KEYS.map((row, i) => (
-        <div key={i} className="flex flex-wrap justify-center gap-1 my-1">
+        <div key={i} className="flex justify-center gap-1 my-1">
           {row.map((key) => {
             const state = usedKeys[key];
             const bgColor = state === 'correct' ? 'bg-green-500 dark:bg-green-600' :
@@ -32,9 +33,9 @@ export function Keyboard({ onKeyPress, usedKeys }: KeyboardProps) {
                 key={key}
                 onClick={() => handleKeyPress(key)}
                 className={`
-                  ${bgColor} text-xl sm:text-2xl font-bold rounded 
-                  px-1 sm:px-3 py-3 sm:py-4 
-                  min-w-[30px] sm:min-w-[40px]
+                  ${bgColor} text-lg sm:text-xl font-bold rounded 
+                  px-1 sm:px-2 py-3 
+                  min-w-[32px] sm:min-w-[38px]
                   transition-all duration-150 ease-in-out
                   hover:opacity-90 active:scale-95
                   relative overflow-hidden
