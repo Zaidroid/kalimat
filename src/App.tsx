@@ -46,6 +46,40 @@ function GameContent() {
   const [isRandomMode, setIsRandomMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+  // New state for multi-tier validation
+  const [localCache, setLocalCache] = useState<Set<string>>(new Set());
+  const [isValidating, setIsValidating] = useState(false);
+
+  // Load local cache from localStorage on mount
+  useEffect(() => {
+    const cachedWords = localStorage.getItem('validWordsCache');
+    if (cachedWords) {
+      setLocalCache(new Set(JSON.parse(cachedWords)));
+    }
+  }, []);
+
+  // Save a word to the local cache
+  const saveToCache = (word: string) => {
+    const newCache = new Set(localCache);
+    newCache.add(word);
+    setLocalCache(newCache);
+    localStorage.setItem('validWordsCache', JSON.stringify(Array.from(newCache)));
+  };
+
+  // Check word validity with DictionaryAPI.dev
+  const checkWordWithAPI = async (word: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/ar/${word}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.length > 0; // Valid if API returns entries
+      }
+      return false; // Invalid if 404 or other non-success status
+    } catch (error) {
+      console.error('API error:', error);
+      throw error; // Propagate error for fallback handling
+    }
+  };
 
   // Update solution and reset game state when mode changes
   const solution = isRandomMode
@@ -66,7 +100,6 @@ function GameContent() {
 
   useEffect(() => {
     if (gameState.gameOver) {
-      // Delay showing stats to allow game state to stabilize
       const timer = setTimeout(() => {
         setShowStats(true);
         saveStats(gameState.gameWon, gameState.guesses.length);
@@ -75,7 +108,6 @@ function GameContent() {
     }
   }, [gameState.gameOver]);
 
-  // Save game state when it changes
   useEffect(() => {
     if (gameState.guesses.length > 0) {
       saveGameState(gameState, evaluations);
@@ -106,7 +138,7 @@ function GameContent() {
   };
 
   const handleKeyPress = (key: string) => {
-    if (gameState.gameOver) return;
+    if (gameState.gameOver || isValidating) return;
 
     if (key === 'Enter') {
       if (gameState.currentGuess.length !== WORD_LENGTH) {
@@ -119,47 +151,71 @@ function GameContent() {
         return;
       }
 
-      if (!WORDS.includes(gameState.currentGuess)) {
-        setInvalidGuess(true);
-        setFeedback(translations.ar.invalidGuessNotInList);
-        setTimeout(() => {
-          setInvalidGuess(false);
-          setFeedback('');
-        }, 600);
-        return;
+      // Process the guess after validation
+      const processGuess = () => {
+        const evaluation = evaluateGuess(gameState.currentGuess, gameState.solution);
+        const newEvaluations = [...evaluations, evaluation];
+        const newGuesses = [...gameState.guesses, gameState.currentGuess];
+
+        const newUsedKeys = { ...usedKeys };
+        [...gameState.currentGuess].forEach((letter, i) => {
+          const currentState = newUsedKeys[letter];
+          const newState = evaluation[i];
+          if (
+            newState === 'correct' ||
+            (newState === 'present' && currentState !== 'correct') ||
+            (!currentState && newState === 'absent')
+          ) {
+            newUsedKeys[letter] = newState;
+          }
+        });
+
+        setIsRevealing(true);
+        setTimeout(() => setIsRevealing(false), 250 * WORD_LENGTH);
+
+        setEvaluations(newEvaluations);
+        setUsedKeys(newUsedKeys);
+
+        setGameState((prev) => ({
+          ...prev,
+          guesses: newGuesses,
+          currentGuess: '',
+          gameWon: gameState.currentGuess === gameState.solution,
+          gameOver:
+            gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES,
+        }));
+      };
+
+      // Multi-tier validation
+      if (WORDS.includes(gameState.currentGuess) || localCache.has(gameState.currentGuess)) {
+        processGuess(); // Tier 1 & 2: Local validation
+      } else {
+        setIsValidating(true);
+        checkWordWithAPI(gameState.currentGuess)
+          .then((isValid) => {
+            setIsValidating(false);
+            if (isValid) {
+              saveToCache(gameState.currentGuess);
+              processGuess(); // Tier 3: API confirmed
+            } else {
+              setInvalidGuess(true);
+              setFeedback(translations.ar.invalidGuessNotInList);
+              setTimeout(() => {
+                setInvalidGuess(false);
+                setFeedback('');
+              }, 600);
+            }
+          })
+          .catch(() => {
+            setIsValidating(false);
+            setInvalidGuess(true);
+            setFeedback('تعذر التحقق من الكلمة، حاول لاحقًا');
+            setTimeout(() => {
+              setInvalidGuess(false);
+              setFeedback('');
+            }, 600);
+          });
       }
-
-      const evaluation = evaluateGuess(gameState.currentGuess, gameState.solution);
-      const newEvaluations = [...evaluations, evaluation];
-      const newGuesses = [...gameState.guesses, gameState.currentGuess];
-
-      const newUsedKeys = { ...usedKeys };
-      [...gameState.currentGuess].forEach((letter, i) => {
-        const currentState = newUsedKeys[letter];
-        const newState = evaluation[i];
-        if (
-          newState === 'correct' ||
-          (newState === 'present' && currentState !== 'correct') ||
-          (!currentState && newState === 'absent')
-        ) {
-          newUsedKeys[letter] = newState;
-        }
-      });
-
-      setIsRevealing(true);
-      setTimeout(() => setIsRevealing(false), 250 * WORD_LENGTH);
-
-      setEvaluations(newEvaluations);
-      setUsedKeys(newUsedKeys);
-
-      setGameState((prev) => ({
-        ...prev,
-        guesses: newGuesses,
-        currentGuess: '',
-        gameWon: gameState.currentGuess === gameState.solution,
-        gameOver:
-          gameState.currentGuess === gameState.solution || newGuesses.length === MAX_GUESSES,
-      }));
     } else if (key === 'Backspace') {
       setGameState((prev) => ({
         ...prev,
