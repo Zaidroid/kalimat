@@ -48,6 +48,7 @@ function GameContent() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [localCache, setLocalCache] = useState<Set<string>>(new Set());
   const [dictionary, setDictionary] = useState<Set<string>>(new Set());
+  const [isValidatingApi, setIsValidatingApi] = useState(false);
 
   // Load local cache and initialize dictionary from DICT on mount
   useEffect(() => {
@@ -72,6 +73,18 @@ function GameContent() {
     setLocalCache(newCache);
     localStorage.setItem('validWordsCache', JSON.stringify(Array.from(newCache)));
     console.log(`Added "${word}" to localCache. New size: ${newCache.size}`);
+  };
+
+  // API call to DictionaryAPI.dev
+  const checkWordWithApi = async (word: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/ar/${word}`);
+      console.log(`API Response Status for "${word}": ${response.status}`);
+      return response.ok; // True if status is 200-299 (word exists)
+    } catch (error) {
+      console.error('API Error:', error);
+      return false; // Fail gracefully on network/API errors
+    }
   };
 
   const solution = isRandomMode
@@ -130,7 +143,7 @@ function GameContent() {
   };
 
   const handleKeyPress = (key: string) => {
-    if (gameState.gameOver) return;
+    if (gameState.gameOver || isValidatingApi) return;
 
     if (key === 'Enter') {
       if (gameState.currentGuess.length !== WORD_LENGTH) {
@@ -196,13 +209,38 @@ function GameContent() {
         setTimeout(() => setFeedback(''), 2000);
         processGuess();
       } else {
-        console.log(`"${gameState.currentGuess}" not found in any list`);
-        setInvalidGuess(true);
-        setFeedback(translations.ar.invalidGuessNotInList);
-        setTimeout(() => {
-          setInvalidGuess(false);
-          setFeedback('');
-        }, 600);
+        // Extra step: Check DictionaryAPI.dev
+        setIsValidatingApi(true);
+        setFeedback('جارٍ التحقق من الكلمة عبر الإنترنت...');
+        checkWordWithApi(gameState.currentGuess)
+          .then((isValid) => {
+            setIsValidatingApi(false);
+            if (isValid) {
+              console.log(`"${gameState.currentGuess}" validated by API`);
+              saveToCache(gameState.currentGuess);
+              setFeedback('تم قبول الكلمة الجديدة عبر الإنترنت!');
+              setTimeout(() => setFeedback(''), 2000);
+              processGuess();
+            } else {
+              console.log(`"${gameState.currentGuess}" rejected by API`);
+              setInvalidGuess(true);
+              setFeedback(translations.ar.invalidGuessNotInList);
+              setTimeout(() => {
+                setInvalidGuess(false);
+                setFeedback('');
+              }, 600);
+            }
+          })
+          .catch(() => {
+            setIsValidatingApi(false);
+            console.log(`API check failed for "${gameState.currentGuess}"`);
+            setInvalidGuess(true);
+            setFeedback('تعذر التحقق من الكلمة، ربما ليست صحيحة');
+            setTimeout(() => {
+              setInvalidGuess(false);
+              setFeedback('');
+            }, 600);
+          });
       }
     } else if (key === 'Backspace') {
       setGameState((prev) => ({
@@ -267,65 +305,65 @@ function GameContent() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-lg mx-auto flex flex-col items-center justify-between p-4">
-        {feedback && (
-          <div className="mb-4 text-center text-red-600 dark:text-red-500">
-            {feedback}
-          </div>
-        )}
-        <Grid
-          guesses={gameState.guesses}
-          currentGuess={gameState.currentGuess}
-          solution={gameState.solution}
-          evaluations={evaluations}
-          isRevealing={isRevealing}
-          invalidGuess={invalidGuess}
-          theme={theme}
-        />
+      <main className="flex-1 w-full max-w-lg mx-auto flex flex-col items-center justify-between p-4 pb-2">
+  {feedback && (
+    <div className="mb-4 text-center text-red-600 dark:text-red-500">
+      {feedback}
+    </div>
+  )}
+  <Grid
+    guesses={gameState.guesses}
+    currentGuess={gameState.currentGuess}
+    solution={gameState.solution}
+    evaluations={evaluations}
+    isRevealing={isRevealing}
+    invalidGuess={invalidGuess}
+    theme={theme}
+  />
 
-        {gameState.gameOver && (
-          <div className="my-4 text-center">
-            {gameState.gameWon ? (
-              <p className="text-2xl font-bold text-green-600 dark:text-green-500">
-                {translations.ar.winMessage}
-              </p>
-            ) : (
-              <div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-500">
-                  {translations.ar.loseMessage}
-                </p>
-                <p className="mt-2 text-gray-800 dark:text-gray-300">
-                  {translations.ar.solutionMessage} {gameState.solution}
-                </p>
-              </div>
-            )}
-            <button
-              onClick={handleShare}
-              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              {translations.ar.shareResult}
-            </button>
-          </div>
-        )}
+  {gameState.gameOver && (
+    <div className="my-2 text-center">
+      {gameState.gameWon ? (
+        <p className="text-2xl font-bold text-green-600 dark:text-green-500">
+          {translations.ar.winMessage}
+        </p>
+      ) : (
+        <div>
+          <p className="text-2xl font-bold text-red-600 dark:text-red-500">
+            {translations.ar.loseMessage}
+          </p>
+          <p className="mt-2 text-gray-800 dark:text-gray-300">
+            {translations.ar.solutionMessage} {gameState.solution}
+          </p>
+        </div>
+      )}
+      <button
+        onClick={handleShare}
+        className="mt-3 bg-blue-500 text-white px-4 py-2 rounded"
+      >
+        {translations.ar.shareResult}
+      </button>
+    </div>
+  )}
 
-        <Keyboard onKeyPress={handleKeyPress} usedKeys={usedKeys} />
+  <Keyboard onKeyPress={handleKeyPress} usedKeys={usedKeys} />
 
-        {showInstructions && (
-          <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
-            <Instructions handleClose={() => setShowInstructions(false)} />
-          </Suspense>
-        )}
-        {showStats && (
-          <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
-            <Statistics
-              stats={loadStats()}
-              solution={gameState.solution}
-              gameWon={gameState.gameWon}
-              handleClose={() => setShowStats(false)}
-            />
-          </Suspense>
-        )}
-      </main>
+  {showInstructions && (
+    <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
+      <Instructions handleClose={() => setShowInstructions(false)} />
+    </Suspense>
+  )}
+  {showStats && (
+    <Suspense fallback={<div className="text-center">جارٍ التحميل...</div>}>
+      <Statistics
+        stats={loadStats()}
+        solution={gameState.solution}
+        gameWon={gameState.gameWon}
+        handleClose={() => setShowStats(false)}
+      />
+    </Suspense>
+  )}
+</main>
     </div>
   );
 }
